@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from otpid.client import Client
 from otpid.errors import (
     ERR_ALREADY_USED,
     ERR_CHANNEL_UNAVAILABLE,
@@ -25,11 +26,28 @@ from otpid.errors import (
     StaleTimestampError,
     UnexpectedEventError,
 )
+from otpid.types import (
+    CHANNEL_EMAIL,
+    CHANNEL_MISSCALL,
+    CHANNEL_SMS,
+    CHANNEL_VOICE,
+    CHANNEL_WHATSAPP,
+    CHANNEL_WHATSAPP_INBOUND,
+    AccountResult,
+    Channel,
+    OrderResult,
+    StatusResult,
+    TopupResult,
+    Verification,
+    VerifiedEvent,
+    VerifyResult,
+)
 
 __version__ = "0.1.0"
 
 __all__ = [
     "__version__",
+    "Client",
     "ERR_UNAUTHORIZED",
     "ERR_VALIDATION",
     "ERR_INVALID_CHANNEL",
@@ -51,4 +69,18 @@ __all__ = [
     "InvalidSignatureError",
     "StaleTimestampError",
     "UnexpectedEventError",
+    "Channel",
+    "CHANNEL_WHATSAPP",
+    "CHANNEL_SMS",
+    "CHANNEL_VOICE",
+    "CHANNEL_EMAIL",
+    "CHANNEL_MISSCALL",
+    "CHANNEL_WHATSAPP_INBOUND",
+    "Verification",
+    "OrderResult",
+    "VerifyResult",
+    "StatusResult",
+    "AccountResult",
+    "TopupResult",
+    "VerifiedEvent",
 ]
