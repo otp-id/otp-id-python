@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "otp-id"
 version = "0.1.0"
 description = "Official Python SDK for the OTP.ID V3 API"
+readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
