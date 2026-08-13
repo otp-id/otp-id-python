@@ -1,24 +1,31 @@
-"""Transport core for the OTP.ID V3 API client.
+"""Transport core and the six V3 endpoint methods for the OTP.ID API client.
 
-Ports the request/response handling of ``otp-id-go/client.go``: build an
+Ports the request/response handling of ``otp-id-go/client.go`` (build an
 authenticated HTTP request via ``urllib.request``, decode the V3
 ``{success, data, error}`` envelope, and raise ``APIError`` for both
-API-reported failures and malformed responses. See ``client_test.go`` for
-the behavior this module mirrors branch-for-branch.
-
-The six public V3 endpoint methods (``request_otp``, ``send_otp``, ...) are
-added on top of ``Client`` in a later module; this file only owns the
-transport core (``__init__`` + ``_do_request``).
+API-reported failures and malformed responses) plus the six public
+endpoint methods from ``order.go``, ``verify.go``, ``status.go``,
+``account.go``, and ``topup.go``. See the corresponding ``*_test.go``
+files for the behavior this module mirrors branch-for-branch.
 """
 
 from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any
 
 from otpid.errors import ERR_INVALID_RESPONSE, APIError
+from otpid.types import (
+    AccountResult,
+    Channel,
+    OrderResult,
+    StatusResult,
+    TopupResult,
+    VerifyResult,
+)
 
 # VERSION is the SDK version, sent in the User-Agent header.
 VERSION = "0.1.0"
@@ -94,6 +101,133 @@ class Client:
                 status = http_error.code
 
         return _decode_envelope(raw, status, expect_data)
+
+    def request_otp(
+        self,
+        *,
+        channel: Channel,
+        destination: str | None = None,
+        brand: str | None = None,
+        otp_length: int | None = None,
+        ttl: int | None = None,
+        external_id: str | None = None,
+    ) -> OrderResult:
+        """Create an OTP transaction with a server-generated code.
+
+        ``POST /v3/request``. The code itself is never returned.
+        """
+        body = _order_params_body(
+            channel=channel,
+            destination=destination,
+            brand=brand,
+            otp_length=otp_length,
+            ttl=ttl,
+            external_id=external_id,
+        )
+        data = self._do_request("POST", "/v3/request", body)
+        return OrderResult._from_dict(data)
+
+    def send_otp(
+        self,
+        otp: str,
+        *,
+        channel: Channel,
+        destination: str | None = None,
+        brand: str | None = None,
+        ttl: int | None = None,
+        external_id: str | None = None,
+    ) -> OrderResult:
+        """Deliver a client-generated code.
+
+        ``POST /v3/send``. The server rejects channel "voice" and
+        "whatsapp_inbound" for this endpoint; use "whatsapp", "sms", or
+        "email".
+        """
+        body = _order_params_body(
+            channel=channel,
+            destination=destination,
+            brand=brand,
+            otp_length=None,
+            ttl=ttl,
+            external_id=external_id,
+        )
+        body["otp"] = otp
+        data = self._do_request("POST", "/v3/send", body)
+        return OrderResult._from_dict(data)
+
+    def verify_otp(self, otp_id: str, otp: str) -> VerifyResult:
+        """Check a user-submitted code against a transaction.
+
+        ``POST /v3/verify``. Do not call this for whatsapp_inbound
+        transactions. Raises ``ValueError`` (no network call) if
+        ``otp_id`` is empty or whitespace-only.
+        """
+        stripped_otp_id = otp_id.strip()
+        if not stripped_otp_id:
+            raise ValueError("otpid: otp_id is empty")
+        body = {"otp_id": stripped_otp_id, "otp": otp}
+        data = self._do_request("POST", "/v3/verify", body)
+        return VerifyResult._from_dict(data)
+
+    def otp_status(self, otp_id: str) -> StatusResult:
+        """Fetch the current state of a transaction.
+
+        ``GET /v3/otp/{otp_id}`` (path-escaped). Raises ``ValueError`` (no
+        network call) if ``otp_id`` is empty or whitespace-only.
+        """
+        stripped_otp_id = otp_id.strip()
+        if not stripped_otp_id:
+            raise ValueError("otpid: otp_id is empty")
+        path = "/v3/otp/" + urllib.parse.quote(stripped_otp_id, safe="")
+        data = self._do_request("GET", path, None)
+        return StatusResult._from_dict(data)
+
+    def account(self) -> AccountResult:
+        """Fetch the merchant profile and credit balance for the API key in use.
+
+        ``GET /v3/account``.
+        """
+        data = self._do_request("GET", "/v3/account", None)
+        return AccountResult._from_dict(data)
+
+    def create_topup(self, amount: int, payment_method_id: int) -> TopupResult:
+        """Create a credit top-up invoice.
+
+        ``POST /v3/topups``. Call this from server-side code only -- never
+        expose your API key to browsers or mobile apps.
+        """
+        body = {"amount": amount, "payment_method_id": payment_method_id}
+        data = self._do_request("POST", "/v3/topups", body)
+        return TopupResult._from_dict(data)
+
+
+def _order_params_body(
+    *,
+    channel: Channel,
+    destination: str | None,
+    brand: str | None,
+    otp_length: int | None,
+    ttl: int | None,
+    external_id: str | None,
+) -> dict[str, Any]:
+    """Build the OrderParams request body, dropping unset (None) fields.
+
+    Mirrors the Go SDK's `json:",omitempty"` tags on `OrderParams`: a field
+    left at its Python default (None) is omitted from the JSON body
+    entirely rather than sent as null.
+    """
+    body: dict[str, Any] = {"channel": channel}
+    if destination is not None:
+        body["destination"] = destination
+    if brand is not None:
+        body["brand"] = brand
+    if otp_length is not None:
+        body["otp_length"] = otp_length
+    if ttl is not None:
+        body["ttl"] = ttl
+    if external_id is not None:
+        body["external_id"] = external_id
+    return body
 
 
 def _decode_envelope(raw: bytes, status: int, expect_data: bool) -> dict[str, Any]:
