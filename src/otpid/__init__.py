@@ -42,6 +42,11 @@ from otpid.types import (
     VerifiedEvent,
     VerifyResult,
 )
+from otpid.webhook import (
+    WEBHOOK_TOLERANCE_SECONDS,
+    parse_verified_event,
+    verify_webhook_signature,
+)
 
 __version__ = "0.1.0"
 
@@ -83,4 +88,7 @@ __all__ = [
     "AccountResult",
     "TopupResult",
     "VerifiedEvent",
+    "WEBHOOK_TOLERANCE_SECONDS",
+    "verify_webhook_signature",
+    "parse_verified_event",
 ]
