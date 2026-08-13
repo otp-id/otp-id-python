@@ -53,7 +53,7 @@ class Verification:
 
 def _verification_from_dict(d: dict[str, Any]) -> Verification | None:
     block = d.get("verification")
-    return Verification._from_dict(block) if block else None
+    return Verification._from_dict(block) if block is not None else None
 
 
 @dataclass(frozen=True)
@@ -77,13 +77,13 @@ class OrderResult:
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> "OrderResult":
         return cls(
-            otp_id=d["otp_id"],
-            status=d["status"],
-            channel=d["channel"],
-            number=d["number"],
-            price=d["price"],
-            last_balance=d["last_balance"],
-            expires_at=d["expires_at"],
+            otp_id=d.get("otp_id", ""),
+            status=d.get("status", ""),
+            channel=d.get("channel", ""),
+            number=d.get("number", ""),
+            price=d.get("price", 0),
+            last_balance=d.get("last_balance", 0),
+            expires_at=d.get("expires_at", ""),
             verification=_verification_from_dict(d),
         )
 
@@ -102,7 +102,11 @@ class VerifyResult:
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> "VerifyResult":
-        return cls(otp_id=d["otp_id"], verified=d["verified"], reason=d["reason"])
+        return cls(
+            otp_id=d.get("otp_id", ""),
+            verified=d.get("verified", False),
+            reason=d.get("reason", ""),
+        )
 
 
 @dataclass(frozen=True)
@@ -124,14 +128,14 @@ class StatusResult:
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> "StatusResult":
         return cls(
-            otp_id=d["otp_id"],
-            status=d["status"],
-            channel=d["channel"],
-            number=d["number"],
-            attempts=d["attempts"],
-            expires_at=d["expires_at"],
-            verified_at=d["verified_at"],
-            price=d["price"],
+            otp_id=d.get("otp_id", ""),
+            status=d.get("status", ""),
+            channel=d.get("channel", ""),
+            number=d.get("number", ""),
+            attempts=d.get("attempts", 0),
+            expires_at=d.get("expires_at", ""),
+            verified_at=d.get("verified_at", ""),
+            price=d.get("price", 0),
             verification=_verification_from_dict(d),
         )
 
@@ -150,12 +154,12 @@ class AccountResult:
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> "AccountResult":
         return cls(
-            merchant_id=d["merchant_id"],
-            name=d["name"],
-            brand_name=d["brand_name"],
-            brand_email=d["brand_email"],
-            email=d["email"],
-            saldo=d["saldo"],
+            merchant_id=d.get("merchant_id", ""),
+            name=d.get("name", ""),
+            brand_name=d.get("brand_name", ""),
+            brand_email=d.get("brand_email", ""),
+            email=d.get("email", ""),
+            saldo=d.get("saldo", 0),
         )
 
 
@@ -181,16 +185,16 @@ class TopupResult:
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> "TopupResult":
         return cls(
-            topup_id=d["topup_id"],
-            payment_url=d["payment_url"],
-            payment_hash=d["payment_hash"],
-            amount=d["amount"],
-            payment_total=d["payment_total"],
-            payment_method_id=d["payment_method_id"],
-            payment_method=d["payment_method"],
-            payment_type=d["payment_type"],
-            payment_expired_at=d["payment_expired_at"],
-            status=d["status"],
+            topup_id=d.get("topup_id", ""),
+            payment_url=d.get("payment_url", ""),
+            payment_hash=d.get("payment_hash", ""),
+            amount=d.get("amount", 0),
+            payment_total=d.get("payment_total", 0),
+            payment_method_id=d.get("payment_method_id", 0),
+            payment_method=d.get("payment_method", ""),
+            payment_type=d.get("payment_type", ""),
+            payment_expired_at=d.get("payment_expired_at", ""),
+            status=d.get("status", ""),
         )
 
 
@@ -208,10 +212,10 @@ class VerifiedEvent:
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> "VerifiedEvent":
         return cls(
-            event=d["event"],
-            otp_id=d["otp_id"],
-            external_id=d["external_id"],
-            channel=d["channel"],
-            number=d["number"],
-            verified_at=d["verified_at"],
+            event=d.get("event", ""),
+            otp_id=d.get("otp_id", ""),
+            external_id=d.get("external_id", ""),
+            channel=d.get("channel", ""),
+            number=d.get("number", ""),
+            verified_at=d.get("verified_at", ""),
         )
