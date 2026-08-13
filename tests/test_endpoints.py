@@ -159,6 +159,43 @@ def test_request_otp_misscall_verification(fake_server) -> None:
     assert res.verification.otp_length == 4
 
 
+def test_request_otp_non_dict_verification_decodes_to_none(fake_server) -> None:
+    """A malformed `verification` field (wrong type, here a string) must
+    decode to `None` instead of leaking an AttributeError from
+    `Verification._from_dict` calling `.get()` on a non-dict."""
+    fixture = {
+        "success": True,
+        "data": {**ORDER_WHATSAPP_FIXTURE["data"], "verification": "oops"},
+        "error": None,
+    }
+    fake_server.enqueue(200, fixture)
+    client = _client(fake_server)
+
+    res = client.request_otp(channel=CHANNEL_WHATSAPP, destination="6281234567890")
+
+    assert res.verification is None
+
+
+def test_request_otp_empty_dict_verification_decodes_to_zero_valued_block(fake_server) -> None:
+    """Regression for the truthiness fix: an empty `verification` object
+    (`{}`) is a legitimate falsy-but-present dict and must decode to a
+    non-None, zero-valued Verification, not None."""
+    fixture = {
+        "success": True,
+        "data": {**ORDER_WHATSAPP_FIXTURE["data"], "verification": {}},
+        "error": None,
+    }
+    fake_server.enqueue(200, fixture)
+    client = _client(fake_server)
+
+    res = client.request_otp(channel=CHANNEL_WHATSAPP, destination="6281234567890")
+
+    assert res.verification is not None
+    assert res.verification.wa_number is None
+    assert res.verification.prefix is None
+    assert res.verification.otp_length is None
+
+
 def test_request_otp_insufficient_balance(fake_server) -> None:
     fake_server.enqueue(
         402,

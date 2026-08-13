@@ -52,8 +52,15 @@ class Verification:
 
 
 def _verification_from_dict(d: dict[str, Any]) -> Verification | None:
+    # Lenient vs. Go: Go's JSON unmarshal would fail the whole envelope
+    # (INVALID_RESPONSE) if `verification` were present with the wrong
+    # type. Here any non-dict value -- including a missing key or explicit
+    # null -- is simply treated as "no verification block" instead of
+    # raising, so this can never crash on a malformed field.
     block = d.get("verification")
-    return Verification._from_dict(block) if block is not None else None
+    if not isinstance(block, dict):
+        return None
+    return Verification._from_dict(block)
 
 
 @dataclass(frozen=True)

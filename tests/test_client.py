@@ -7,6 +7,8 @@ instead of Go's httptest.NewServer.
 
 from __future__ import annotations
 
+import urllib.error
+
 import pytest
 
 from otpid.client import VERSION, Client
@@ -109,3 +111,27 @@ def test_do_request_success_null_data_is_invalid_response(fake_server) -> None:
         client._do_request("GET", "/v3/account", None, expect_data=True)
 
     assert exc_info.value.code == ERR_INVALID_RESPONSE
+
+
+def test_do_request_success_non_dict_data_is_invalid_response(fake_server) -> None:
+    """A success envelope whose `data` is valid JSON but not an object (here
+    a list) must raise the documented APIError instead of leaking an
+    AttributeError when the caller's `_from_dict` tries `.get()` on it."""
+    fake_server.enqueue(200, {"success": True, "data": [1, 2], "error": None})
+    client = Client("test-key", base_url=fake_server.url)
+
+    with pytest.raises(APIError) as exc_info:
+        client._do_request("GET", "/v3/account", None, expect_data=True)
+
+    assert exc_info.value.code == ERR_INVALID_RESPONSE
+
+
+def test_do_request_connection_refused_raises_url_error_unwrapped() -> None:
+    """A transport-level failure (no HTTP response at all) must propagate as
+    a plain urllib.error.URLError, not be wrapped into an APIError."""
+    client = Client("k", base_url="http://127.0.0.1:1", timeout=1.0)
+
+    with pytest.raises(urllib.error.URLError) as exc_info:
+        client._do_request("GET", "/v3/account", None, expect_data=False)
+
+    assert not isinstance(exc_info.value, APIError)

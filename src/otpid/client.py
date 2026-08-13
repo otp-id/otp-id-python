@@ -70,7 +70,8 @@ class Client:
         - a non-success envelope (``error`` is surfaced as-is);
         - a response body that cannot be decoded as the V3 envelope
           (``ERR_INVALID_RESPONSE``, message = a ~200 char body snippet);
-        - a successful envelope whose ``data`` is null/missing when
+        - a successful envelope whose ``data`` is null/missing, or is not a
+          JSON object (e.g. a list, string, or number), when
           ``expect_data`` is True (``ERR_INVALID_RESPONSE``).
 
         A plain ``URLError`` (network failure, no HTTP response at all) is
@@ -252,7 +253,7 @@ def _decode_envelope(raw: bytes, status: int, expect_data: bool) -> dict[str, An
 
     data = envelope.get("data")
     if expect_data:
-        if data is None:
+        if data is None or not isinstance(data, dict):
             raise _invalid_response(raw, status)
         return data
     return data if isinstance(data, dict) else {}
