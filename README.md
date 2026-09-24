@@ -75,6 +75,27 @@ with `verified: false`, and the SDK returns a `VerifyResult(verified=False,
 reason="mismatch")`. Expired, locked, or already-used transactions do raise
 an `APIError` (`OTP_EXPIRED`, `TOO_MANY_ATTEMPTS`, `ALREADY_USED`).
 
+### Delivery failure reason
+
+A transaction that failed *after* being accepted (`status: "failed"`) is
+also **not** an `APIError` — the order/status call still returns HTTP 200,
+with a `failure` block on the result:
+
+```python
+res = client.request_otp(channel=CHANNEL_WHATSAPP, destination="6281234567890")
+if res.status == "failed" and res.failure is not None:
+    print(res.failure.code, "-", res.failure.message)
+    # e.g. NUMBER_NOT_ON_WHATSAPP - Nomor tujuan tidak terdaftar di WhatsApp
+```
+
+The same `failure` block is returned by `otp_status` for a transaction that
+later ends up failed (e.g. after polling). `failure.code` is one of the
+`FAILURE_*` constants (`FAILURE_NUMBER_NOT_ON_WHATSAPP`,
+`FAILURE_TOO_FREQUENT`, `FAILURE_CHANNEL_UNAVAILABLE`,
+`FAILURE_PROVIDER_UNAVAILABLE`, `FAILURE_DELIVERY_FAILED`) but is typed as
+a plain `str` — treat the set as open and fall back to `failure.message`
+(already a user-safe, Indonesian string) for codes you don't recognize.
+
 ## Channels
 
 | Constant | Value | Notes |
@@ -115,6 +136,11 @@ from otpid import CHANNEL_WHATSAPP_INBOUND
 res = client.request_otp(channel=CHANNEL_WHATSAPP_INBOUND)
 print("Ask the user to tap:", res.verification.wa_link)
 ```
+
+`otp_status` also returns the same `verification` block
+(`wa_number`/`message`/`wa_link`/`expires_at`) while the transaction is
+still pending and not yet expired — poll it to recover the link if the
+original order response was lost.
 
 ### Missed Call
 
