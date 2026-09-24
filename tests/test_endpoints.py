@@ -26,6 +26,7 @@ from otpid.types import (
     CHANNEL_SMS,
     CHANNEL_WHATSAPP,
     CHANNEL_WHATSAPP_INBOUND,
+    FAILURE_NUMBER_NOT_ON_WHATSAPP,
 )
 
 # Fixtures mirror otp-id-go/order_test.go byte-for-byte.
@@ -81,6 +82,24 @@ ORDER_MISSCALL_FIXTURE = {
     "error": None,
 }
 
+ORDER_FAILED_FIXTURE = {
+    "success": True,
+    "data": {
+        "otp_id": "OTP20260807ABCD000004",
+        "status": "failed",
+        "channel": "whatsapp",
+        "number": "6281234567890",
+        "price": 350,
+        "last_balance": 99650,
+        "expires_at": "2026-08-07 10:05:00",
+        "failure": {
+            "code": FAILURE_NUMBER_NOT_ON_WHATSAPP,
+            "message": "Nomor tujuan tidak terdaftar di WhatsApp",
+        },
+    },
+    "error": None,
+}
+
 
 def _client(fake_server) -> Client:
     return Client("test-key", base_url=fake_server.url)
@@ -121,6 +140,7 @@ def test_request_otp_whatsapp(fake_server) -> None:
     assert res.price == 350
     assert res.last_balance == 99650
     assert res.verification is None
+    assert res.failure is None
 
 
 def test_request_otp_omits_empty_optional_fields(fake_server) -> None:
@@ -211,6 +231,38 @@ def test_request_otp_insufficient_balance(fake_server) -> None:
         client.request_otp(channel=CHANNEL_SMS, destination="6281234567890")
 
     assert exc_info.value.code == ERR_INSUFFICIENT_BALANCE
+
+
+def test_request_otp_failed_includes_failure(fake_server) -> None:
+    """A `status: "failed"` order response (HTTP 200 -- delivery failure is
+    not a transport error) carries a `failure` block with a public code and
+    an Indonesian, user-safe message."""
+    fake_server.enqueue(200, ORDER_FAILED_FIXTURE)
+    client = _client(fake_server)
+
+    res = client.request_otp(channel=CHANNEL_WHATSAPP, destination="6281234567890")
+
+    assert res.status == "failed"
+    assert res.failure is not None
+    assert res.failure.code == FAILURE_NUMBER_NOT_ON_WHATSAPP
+    assert res.failure.message == "Nomor tujuan tidak terdaftar di WhatsApp"
+
+
+def test_request_otp_non_dict_failure_decodes_to_none(fake_server) -> None:
+    """A malformed `failure` field (wrong type) must decode to `None`
+    instead of leaking an AttributeError, mirroring the `verification`
+    leniency test above."""
+    fixture = {
+        "success": True,
+        "data": {**ORDER_FAILED_FIXTURE["data"], "failure": "oops"},
+        "error": None,
+    }
+    fake_server.enqueue(200, fixture)
+    client = _client(fake_server)
+
+    res = client.request_otp(channel=CHANNEL_WHATSAPP, destination="6281234567890")
+
+    assert res.failure is None
 
 
 # --- send_otp ------------------------------------------------------------
@@ -341,6 +393,7 @@ def test_otp_status(fake_server) -> None:
     assert res.verified_at == ""
     assert res.price == 350
     assert res.verification is None
+    assert res.failure is None
 
 
 def test_otp_status_misscall_prefix(fake_server) -> None:
@@ -368,6 +421,82 @@ def test_otp_status_misscall_prefix(fake_server) -> None:
 
     assert res.verification is not None
     assert res.verification.prefix == "628559263"
+
+
+def test_otp_status_inbound_verification(fake_server) -> None:
+    """GET /v3/otp/{otp_id} now also carries the `verification` block for a
+    pending, not-yet-expired whatsapp_inbound transaction, so polling
+    clients (not just the initial order response) can render the wa.me
+    link."""
+    fake_server.enqueue(
+        200,
+        {
+            "success": True,
+            "data": {
+                "otp_id": "OTP20260807ABCD000002",
+                "status": "pending",
+                "channel": "whatsapp_inbound",
+                "number": "",
+                "attempts": 0,
+                "expires_at": "2026-08-07 10:05:00",
+                "verified_at": "",
+                "price": 350,
+                "verification": {
+                    "wa_number": "6285212345678",
+                    "message": (
+                        "OTPID V-8FK2QN9P — verifikasi MyApp. Kirim pesan ini "
+                        "tanpa mengubah isinya."
+                    ),
+                    "wa_link": "https://wa.me/6285212345678?text=OTPID%20V-8FK2QN9P",
+                    "expires_at": "2026-08-07 10:05:00",
+                },
+            },
+            "error": None,
+        },
+    )
+    client = _client(fake_server)
+
+    res = client.otp_status("OTP20260807ABCD000002")
+
+    assert res.channel == "whatsapp_inbound"
+    assert res.verification is not None
+    assert res.verification.wa_number == "6285212345678"
+    assert res.verification.wa_link == "https://wa.me/6285212345678?text=OTPID%20V-8FK2QN9P"
+    assert res.verification.message
+    assert res.verification.expires_at == "2026-08-07 10:05:00"
+    assert res.failure is None
+
+
+def test_otp_status_failed_includes_failure(fake_server) -> None:
+    fake_server.enqueue(
+        200,
+        {
+            "success": True,
+            "data": {
+                "otp_id": "OTP20260807ABCD000004",
+                "status": "failed",
+                "channel": "whatsapp",
+                "number": "6281234567890",
+                "attempts": 0,
+                "expires_at": "2026-08-07 10:05:00",
+                "verified_at": "",
+                "price": 350,
+                "failure": {
+                    "code": FAILURE_NUMBER_NOT_ON_WHATSAPP,
+                    "message": "Nomor tujuan tidak terdaftar di WhatsApp",
+                },
+            },
+            "error": None,
+        },
+    )
+    client = _client(fake_server)
+
+    res = client.otp_status("OTP20260807ABCD000004")
+
+    assert res.status == "failed"
+    assert res.failure is not None
+    assert res.failure.code == FAILURE_NUMBER_NOT_ON_WHATSAPP
+    assert res.failure.message == "Nomor tujuan tidak terdaftar di WhatsApp"
 
 
 def test_otp_status_path_escapes_otp_id(fake_server) -> None:
@@ -526,3 +655,4 @@ def test_incomplete_order_payload_decodes_with_zero_values(fake_server) -> None:
     assert res.last_balance == 0
     assert res.expires_at == ""
     assert res.verification is None
+    assert res.failure is None

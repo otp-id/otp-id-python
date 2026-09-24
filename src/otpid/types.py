@@ -20,6 +20,16 @@ CHANNEL_EMAIL: Channel = "email"
 CHANNEL_MISSCALL: Channel = "misscall"
 CHANNEL_WHATSAPP_INBOUND: Channel = "whatsapp_inbound"
 
+# FAILURE_* are the known values of DeliveryFailure.code. This set may grow
+# server-side over time, so DeliveryFailure.code is typed `str` (not
+# `Literal`) -- always compare against these constants rather than assuming
+# the set is exhaustive.
+FAILURE_NUMBER_NOT_ON_WHATSAPP = "NUMBER_NOT_ON_WHATSAPP"
+FAILURE_TOO_FREQUENT = "TOO_FREQUENT"
+FAILURE_CHANNEL_UNAVAILABLE = "CHANNEL_UNAVAILABLE"
+FAILURE_PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
+FAILURE_DELIVERY_FAILED = "DELIVERY_FAILED"
+
 
 @dataclass(frozen=True)
 class Verification:
@@ -64,6 +74,36 @@ def _verification_from_dict(d: dict[str, Any]) -> Verification | None:
 
 
 @dataclass(frozen=True)
+class DeliveryFailure:
+    """Machine-readable delivery failure reason.
+
+    Present (as ``OrderResult.failure`` / ``StatusResult.failure``) only
+    when the transaction's ``status`` is ``"failed"``; ``None`` otherwise.
+    ``code`` is one of the ``FAILURE_*`` constants, but is typed ``str``
+    (not ``Literal``) since the server may add new codes over time --
+    always tolerate an unrecognized code rather than raising on it.
+    ``message`` is a human-readable Indonesian message safe to show to end
+    users; it is never the raw vendor/provider error detail.
+    """
+
+    code: str
+    message: str
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> "DeliveryFailure":
+        return cls(code=d.get("code", ""), message=d.get("message", ""))
+
+
+def _failure_from_dict(d: dict[str, Any]) -> DeliveryFailure | None:
+    # Same leniency rationale as `_verification_from_dict`: a missing or
+    # malformed `failure` field decodes to None instead of raising.
+    block = d.get("failure")
+    if not isinstance(block, dict):
+        return None
+    return DeliveryFailure._from_dict(block)
+
+
+@dataclass(frozen=True)
 class OrderResult:
     """Success payload of ``POST /v3/request`` and ``POST /v3/send``."""
 
@@ -80,6 +120,9 @@ class OrderResult:
     # the SDK does not parse server datetimes.
     expires_at: str
     verification: Verification | None = None
+    # failure is set only when status == "failed" -- None for every other
+    # status, including on a successful idempotency replay.
+    failure: DeliveryFailure | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> "OrderResult":
@@ -92,6 +135,7 @@ class OrderResult:
             last_balance=d.get("last_balance", 0),
             expires_at=d.get("expires_at", ""),
             verification=_verification_from_dict(d),
+            failure=_failure_from_dict(d),
         )
 
 
@@ -128,9 +172,13 @@ class StatusResult:
     expires_at: str
     verified_at: str  # "" until verified
     price: int
-    # Only present for not-yet-verified misscall transactions (prefix
-    # field), so polling clients can build their UI.
+    # Present for not-yet-verified misscall transactions (prefix field) and
+    # for pending, not-yet-expired whatsapp_inbound transactions
+    # (wa_number/message/wa_link/expires_at), so polling clients can build
+    # their UI without re-requesting the OTP.
     verification: Verification | None = None
+    # failure is set only when status == "failed" -- None otherwise.
+    failure: DeliveryFailure | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> "StatusResult":
@@ -144,6 +192,7 @@ class StatusResult:
             verified_at=d.get("verified_at", ""),
             price=d.get("price", 0),
             verification=_verification_from_dict(d),
+            failure=_failure_from_dict(d),
         )
 
 
