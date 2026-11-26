@@ -28,7 +28,7 @@ from otpid.types import (
 )
 
 # VERSION is the SDK version, sent in the User-Agent header.
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 _DEFAULT_BASE_URL = "https://api.otp.id"
 _DEFAULT_TIMEOUT = 30.0
