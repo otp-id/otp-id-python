@@ -6,6 +6,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-26
+
 ### Added
 
 - `DeliveryFailure` (`code` + `message`) and `FAILURE_*` code constants
@@ -22,11 +24,14 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Documented status values: `whatsapp_inbound` now starts as `pending`
-  (was `pending`) and can end as `expired` (not charged); it is charged only
-  when `verified`, so `OrderResult.price` is the amount due on verification
-  and `last_balance` is unchanged at request time. Doc-only; `status` stays
-  a plain `str`.
+- `whatsapp_inbound` billing (server-side change): transactions are now
+  charged only when they become `verified`. They stay `pending` while
+  waiting for the user's WhatsApp message and can end as `expired` (TTL
+  passed without a match; not charged). `OrderResult.price` is the amount
+  charged on verification, and `last_balance` is unchanged at request time.
+  A message from a different number than the bound `destination` is
+  rejected and the transaction stays `pending`. Doc-only in the SDK;
+  `status` stays a plain `str`.
 
 ## [0.1.0] - 2026-08-14
 
@@ -43,3 +48,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - `README.md` and runnable examples for every channel (`whatsapp`, `sms`,
   `voice`, `email`, `misscall`, `whatsapp_inbound`, `send`), mirroring the
   cURL examples in the API docs.
+
+[Unreleased]: https://github.com/otp-id/otp-id-python/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/otp-id/otp-id-python/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/otp-id/otp-id-python/releases/tag/v0.1.0

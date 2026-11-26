@@ -19,6 +19,8 @@ pip install otp-id
 
 Requires Python 3.10+.
 
+Upgrading from an earlier version? See [UPGRADING.md](UPGRADING.md).
+
 ## Quickstart
 
 ```python
