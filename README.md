@@ -130,12 +130,12 @@ match their incoming message. Never call `verify_otp` for these
 transactions — detect completion via the `otp.verified` webhook or by
 polling `otp_status`.
 
-The transaction starts as `waiting` and ends as `verified` or `expired`
+The transaction starts as `pending` and ends as `verified` or `expired`
 (`expires_at` passed without a match). **You only pay for verified
 transactions:** `res.price` is what will be charged if the user verifies,
 `res.last_balance` is unchanged at request time, and `expired` transactions
 are never charged. With a bound `destination`, a message from another number
-is rejected and the transaction stays `waiting`.
+is rejected and the transaction stays `pending`.
 
 ```python
 from otpid import CHANNEL_WHATSAPP_INBOUND
@@ -146,7 +146,7 @@ print("Ask the user to tap:", res.verification.wa_link)
 
 `otp_status` also returns the same `verification` block
 (`wa_number`/`message`/`wa_link`/`expires_at`) while the transaction is
-still `waiting` and not yet expired — poll it to recover the link if the
+still `pending` and not yet expired — poll it to recover the link if the
 original order response was lost.
 
 ### Missed Call
