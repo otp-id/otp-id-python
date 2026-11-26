@@ -108,8 +108,8 @@ class OrderResult:
     """Success payload of ``POST /v3/request`` and ``POST /v3/send``."""
 
     otp_id: str
-    # status is one of: sent | success | failed | pending | waiting.
-    # whatsapp_inbound always starts as "waiting" (not charged until
+    # status is one of: sent | success | failed | pending.
+    # whatsapp_inbound always starts as "pending" (not charged until
     # verified); "pending" may appear for some vendor deliveries. An
     # idempotency replay reflects the current state, so it may also be
     # "verified" or (whatsapp_inbound only) "expired".
@@ -173,9 +173,9 @@ class StatusResult:
     """Success payload of ``GET /v3/otp/{otp_id}``."""
 
     otp_id: str
-    # status is one of: sent | success | failed | pending | waiting |
-    # verified | expired. "waiting" (initial) and "expired" (expires_at
-    # passed without verification; terminal, not charged) apply to
+    # status is one of: sent | success | failed | pending |
+    # verified | expired. "expired" (expires_at
+    # passed without verification; terminal, not charged) applies to
     # whatsapp_inbound only; whatsapp_inbound is charged only once
     # "verified".
     status: str
@@ -186,7 +186,7 @@ class StatusResult:
     verified_at: str  # "" until verified
     price: int
     # Present for not-yet-verified misscall transactions (prefix field) and
-    # for waiting, not-yet-expired whatsapp_inbound transactions
+    # for pending, not-yet-expired whatsapp_inbound transactions
     # (wa_number/message/wa_link/expires_at), so polling clients can build
     # their UI without re-requesting the OTP.
     verification: Verification | None = None
