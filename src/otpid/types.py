@@ -108,13 +108,21 @@ class OrderResult:
     """Success payload of ``POST /v3/request`` and ``POST /v3/send``."""
 
     otp_id: str
-    status: str  # pending | sent | success | failed
+    # status is one of: sent | success | failed | pending | waiting.
+    # whatsapp_inbound always starts as "waiting" (not charged until
+    # verified); "pending" may appear for some vendor deliveries. An
+    # idempotency replay reflects the current state, so it may also be
+    # "verified" or (whatsapp_inbound only) "expired".
+    status: str
     channel: Channel
     number: str
+    # price is the credit cost of this transaction. For whatsapp_inbound it
+    # is the amount charged only if the transaction is verified; nothing is
+    # deducted at request time.
     price: int
     # last_balance is the remaining credit after this transaction. It stays
-    # unchanged when delivery failed (status "failed") or on an idempotency
-    # replay.
+    # unchanged when delivery failed (status "failed"), on an idempotency
+    # replay, and for whatsapp_inbound (charged only when verified).
     last_balance: int
     # expires_at is "YYYY-MM-DD HH:MM:SS" in WIB (UTC+7). Kept as a string;
     # the SDK does not parse server datetimes.
@@ -165,7 +173,12 @@ class StatusResult:
     """Success payload of ``GET /v3/otp/{otp_id}``."""
 
     otp_id: str
-    status: str  # sent | success | failed | pending | verified
+    # status is one of: sent | success | failed | pending | waiting |
+    # verified | expired. "waiting" (initial) and "expired" (expires_at
+    # passed without verification; terminal, not charged) apply to
+    # whatsapp_inbound only; whatsapp_inbound is charged only once
+    # "verified".
+    status: str
     channel: Channel
     number: str
     attempts: int
@@ -173,7 +186,7 @@ class StatusResult:
     verified_at: str  # "" until verified
     price: int
     # Present for not-yet-verified misscall transactions (prefix field) and
-    # for pending, not-yet-expired whatsapp_inbound transactions
+    # for waiting, not-yet-expired whatsapp_inbound transactions
     # (wa_number/message/wa_link/expires_at), so polling clients can build
     # their UI without re-requesting the OTP.
     verification: Verification | None = None

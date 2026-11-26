@@ -15,10 +15,18 @@ project adheres to [Semantic Versioning](https://semver.org/).
   `StatusResult.failure` are populated from the response's `failure` block
   whenever `status == "failed"`, `None` otherwise.
 - `StatusResult.verification` (`otp_status` / `GET /v3/otp/{otp_id}`) is now
-  also populated for a pending, not-yet-expired `whatsapp_inbound`
+  also populated for a waiting, not-yet-expired `whatsapp_inbound`
   transaction (`wa_number`/`message`/`wa_link`/`expires_at`), matching what
   `request_otp` already returned, so polling clients can recover the wa.me
   link.
+
+### Changed
+
+- Documented status values: `whatsapp_inbound` now starts as `waiting`
+  (was `pending`) and can end as `expired` (not charged); it is charged only
+  when `verified`, so `OrderResult.price` is the amount due on verification
+  and `last_balance` is unchanged at request time. Doc-only; `status` stays
+  a plain `str`.
 
 ## [0.1.0] - 2026-08-14
 
